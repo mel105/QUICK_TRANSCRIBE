@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>quick_transcribe</title>
+<link rel="icon" type="image/png" href="/icon.png">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <header class="brand">
+      <span class="brand-name">quick_transcribe</span>
+      <span class="brand-ver" id="ver"></span>
+    </header>
+
+    <section class="side-block">
+      <button class="btn primary wide" id="btnAdd">Add recordings…</button>
+      <input type="file" id="fileInput" multiple accept=".m4a,.mp3,.wav,.mp4,.aac,.ogg,.opus,.flac,.webm,.wma,.mkv,.mov,audio/*,video/*" hidden>
+      <div class="hint">or drop files anywhere on the page</div>
+    </section>
+
+    <section class="side-block">
+      <input id="search" type="search" placeholder="Search all transcripts" autocomplete="off">
+    </section>
+
+    <section class="side-block grow">
+      <div class="block-head"><h2 id="listTitle">Recordings</h2><span class="count" id="listCount"></span></div>
+      <div id="list"></div>
+    </section>
+
+    <section class="side-block jobs" id="jobsBlock" hidden>
+      <div class="block-head"><h2>Queue</h2><button class="btn quiet small" id="btnClearJobs" title="Hide finished jobs">Clear</button></div>
+      <div id="jobs"></div>
+    </section>
+  </aside>
+
+  <main id="main">
+    <div id="toolbar">
+      <input id="recName" type="text" placeholder="Recording name" disabled>
+      <span class="spacer"></span>
+      <div class="menu" id="exportMenu">
+        <button class="btn" id="btnExport" disabled>Export ▾</button>
+        <div class="menu-items" hidden>
+          <button data-fmt="txt">TXT with times</button>
+          <button data-fmt="plain">TXT plain text</button>
+          <button data-fmt="md">Markdown</button>
+          <button data-fmt="srt">SRT subtitles</button>
+        </div>
+      </div>
+      <button class="btn" id="btnCopy" disabled title="Copy the transcript with times">Copy</button>
+      <button class="btn" id="btnReplace" disabled title="Replace a misheard word in the whole transcript">Replace…</button>
+      <button class="btn" id="btnRedo" disabled title="Transcribe this recording again (other model or language)">Transcribe again…</button>
+      <button class="btn danger" id="btnDelete" disabled>Delete</button>
+      <span class="sep"></span>
+      <button class="btn quiet" id="btnBackup" title="Back up the database and archived audio">Backup</button>
+      <button class="btn quiet" id="btnSettings">Settings</button>
+      <button class="btn quiet" id="btnQuit" title="Stop quick_transcribe">Quit</button>
+    </div>
+
+    <div id="meta"></div>
+
+    <div id="player" hidden>
+      <audio id="audio" controls preload="metadata"></audio>
+      <label class="chk"><input type="checkbox" id="follow" checked> Follow playback</label>
+      <select id="rate" title="Playback speed">
+        <option value="0.75">0.75×</option><option value="1" selected>1×</option>
+        <option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option>
+      </select>
+    </div>
+
+    <div id="content">
+      <div id="empty">
+        <h1>Offline transcription</h1>
+        <p>Add a recording (m4a, mp3, wav, mp4 …) with the button on the left or drop it on the page.
+           It is transcribed on this computer and stored in a searchable archive.</p>
+        <ul>
+          <li><b>Click a time</b> to play the recording from that moment.</li>
+          <li><b>Click the text</b> to correct it; Enter or leaving the line saves. The original is kept.</li>
+          <li><b>Replace…</b> fixes a misheard name in the whole transcript at once.</li>
+          <li>Add project terms and names to the <b>glossary</b> in Settings; the model then recognises them better.</li>
+          <li>Shortcuts: <kbd>Space</kbd> play / pause (outside the text), <kbd>Ctrl</kbd>+<kbd>F</kbd> search.</li>
+        </ul>
+      </div>
+      <div id="transcript" hidden></div>
+    </div>
+    <div id="status"><span id="statusText"></span></div>
+  </main>
+</div>
+
+<div id="drop" hidden><div>Drop recordings to transcribe</div></div>
+
+<dialog id="dlgSettings">
+  <form method="dialog" id="formSettings">
+    <h2>Settings</h2>
+    <div class="grid">
+      <label for="sModel">Model</label>
+      <div><select id="sModel"></select>
+        <div class="help">tiny / base: fast, rough · small: good default · medium: better names and accents, ~3× slower · large-v3: best, slow on CPU</div></div>
+      <label for="sLang">Language</label>
+      <div><select id="sLang"></select></div>
+      <label for="sDevice">Device</label>
+      <div><select id="sDevice"><option value="cpu">CPU</option><option value="cuda">NVIDIA GPU (CUDA)</option></select></div>
+      <label>Network</label>
+      <div><label class="chk"><input type="checkbox" id="sOffline"> Offline only – never contact Hugging Face</label>
+        <div class="help">Turn on after the model has been downloaded once.</div></div>
+      <label for="sGlossary">Glossary</label>
+      <div><textarea id="sGlossary" rows="7" placeholder="One term per line: ASTP, EGNOS, names of people …"></textarea>
+        <div class="help">Given to the model as a hint. Keep it short (up to ~50 terms).</div></div>
+      <label>Audio</label>
+      <div><label class="chk"><input type="checkbox" id="sArchive"> Keep a compact copy (Opus 16 kHz mono, ~10 MB per hour)</label>
+        <div class="help">Needed for playback and Transcribe again. The original file is never changed.</div></div>
+      <label>TXT file</label>
+      <div><label class="chk"><input type="checkbox" id="sTxt"> Also write a .txt next to the source file (files opened from disk)</label></div>
+      <label for="sBackup">Backup folder</label>
+      <div><input type="text" id="sBackup" placeholder="e.g. C:\Users\me\OneDrive - company\Backups"></div>
+      <label>Data folder</label>
+      <div><code id="sData"></code><div class="help">Set <code>data_dir</code> in quick_transcribe.json to move it.</div></div>
+    </div>
+    <div class="dlg-btns">
+      <button class="btn" value="cancel" formnovalidate>Cancel</button>
+      <button class="btn primary" id="btnSaveSettings" value="save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgRedo">
+  <form method="dialog">
+    <h2>Transcribe again</h2>
+    <p class="help">The current transcript and your edits of it are replaced.</p>
+    <div class="grid">
+      <label for="rModel">Model</label><div><select id="rModel"></select></div>
+      <label for="rLang">Language</label><div><select id="rLang"></select></div>
+    </div>
+    <div class="dlg-btns">
+      <button class="btn" value="cancel" formnovalidate>Cancel</button>
+      <button class="btn primary" value="ok">Start</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgReplace">
+  <form method="dialog">
+    <h2>Replace in this transcript</h2>
+    <div class="grid">
+      <label for="fFind">Find</label><div><input type="text" id="fFind" required></div>
+      <label for="fRepl">Replace with</label><div><input type="text" id="fRepl"></div>
+      <label></label><div><label class="chk"><input type="checkbox" id="fWhole" checked> Whole word only</label></div>
+    </div>
+    <div class="dlg-btns">
+      <button class="btn" value="cancel" formnovalidate>Cancel</button>
+      <button class="btn primary" value="ok">Replace all</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast" hidden></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

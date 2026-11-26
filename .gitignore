@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# virtual environments
+.venv/
+venv/
+env/
+
+# editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# data of the app (default lives in ~/.quick_transcribe, but never commit it if moved here)
+*.db
+*.db-wal
+*.db-shm
+*.log
+*.log.1
+*.part
+inbox/
+audio/
+quick_transcribe_backup/
+
+# recordings and transcripts that may end up in the folder while testing
+*.m4a
+*.mp3
+*.wav
+*.mp4
+*.aac
+*.ogg
+*.opus
+*.flac
+*.webm
+*.srt
+
+# local overrides of the config
+quick_transcribe.local.json
